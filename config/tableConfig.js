@@ -18,7 +18,7 @@ const config = {
   ],
 
   memberRequiredFields:[
-    "memberId",
+    
     "memberName",
     "memberSurname",
     "dateOfBirth",

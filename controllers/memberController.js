@@ -1,10 +1,18 @@
 const sql = require('mssql')
 const checkRequiredFields = require('../utils/missingFields')
 const config = require('../config/tableConfig')
+const crypto = require("crypto")
+const bcrypt = require("bcrypt")
 
 // Create/POST member to db
 exports.addProspect = async(req, res) => {
     const requiredFields = config.memberRequiredFields
+
+    const generateTempPassword = () => {
+        return crypto.randomBytes(8).toString('hex')
+    }
+
+    const hashedPassword = await bcrypt.hash(generateTempPassword(), 10)
 
     // Validate required fields
     const missingFields = checkRequiredFields(req.body, requiredFields)
@@ -18,7 +26,7 @@ exports.addProspect = async(req, res) => {
     // add member to db with stored procedure
     try{
         const request = new sql.Request()
-        request.input('member_id', sql.VarChar(50), req.body.memberId);
+        request.input('password', sql.VarChar(255), hashedPassword);
         request.input('member_name', sql.VarChar(50), req.body.memberName);
         request.input('member_surname', sql.VarChar(50), req.body.memberSurname);
         request.input('date_of_birth', sql.Date, req.body.dateOfBirth);
