@@ -2,6 +2,8 @@ const express = require('express')
 require('dotenv').config() // Load environment variables from .env file
 const sql = require('mssql')
 const dbConfig = require('./config/db')
+const prospectRoutes = require('./routes/prospectRoute')
+const memberRoutes = require('./routes/memberRoute')
 
 const app = express()
 const port = process.env.PORT
@@ -9,22 +11,26 @@ const port = process.env.PORT
 app.get('/', (req, res) => {
     res.send("Hello world")
 })
-
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`)
 })
 
+app.use(express.json()) // Middleware to parse JSON bodies
 
-async function getClients(){
-    try{
-        const pool = await sql.connect(dbConfig)
-        console.log('Connected to the database successfully')
+// routes
+app.use('/prospects', prospectRoutes)
+app.use('/members', memberRoutes)
 
-        const results = await pool.request().query('SELECT * FROM Users')
-        console.log(results.recordset)
-    } catch(err){
-        console.error('SQL error', err)
-    }
-}
-
-getClients()
+// Connect to SQL Server
+sql
+  .connect(dbConfig)
+  .then(() => {
+    console.log("Connected to SQL Server");
+    // Start server
+    app.listen(port, () => {
+      console.log(`Server is running on http://localhost:${port}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Database connection failed:", err);
+  });
