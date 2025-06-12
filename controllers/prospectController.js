@@ -85,11 +85,15 @@ exports.updateProspectStatus = async(req, res) => {
     const { id } = req.params
     const { status, comment, modifiedBy } = req.body
 
+    const generateTempPassword = () => {
+      return crypto.randomBytes(8).toString("hex");
+    };
+
     try{
         // update status and comment in prospect table
         let request = new sql.Request()
-        request.input('_id', sql.UniqueIdentifier, id)
-        request.input('_status', sql.VarChar(50), status)
+        request.input('prospect_id', sql.UniqueIdentifier, id)
+        request.input('status', sql.VarChar(50), status)
         await request.execute('UpdateProspectStatus')
 
         // Insert into review table
@@ -100,11 +104,26 @@ exports.updateProspectStatus = async(req, res) => {
         request.input('status', sql.VarChar(50), status)
         await request.execute('InsertProspectReview')
 
-        // Get prospect email and send notification
+        // Get prospect email for sending notification
         request = new sql.Request()
         request.input("prospect_id", sql.UniqueIdentifier, id);
         const result = await request.execute('getProspect')
         const prospect = result.recordset[0]
+
+        let memberId = null
+
+        if (status === "approved") {
+          const hashedPassword = await bcrypt.hash(generateTempPassword(), 10);
+
+          // Add prospect to member table
+          let request = new sql.Request();
+          request.input("password", sql.VarChar(100), hashedPassword);
+          request.input("prospect_id", sql.UniqueIdentifier, id);
+          const memberResult = await request.execute("AddMember");
+
+          // Get member ID from result
+          memberId = memberResult.recordset[0].member_id
+        }
 
         if(prospect){
             // send email
@@ -116,16 +135,29 @@ exports.updateProspectStatus = async(req, res) => {
               },
             });
 
+            let emailText =  `
+            <p>Dear ${prospect.prospect_name},</p>
+            <p>Your prospect status has been updated to <strong>${status}</strong>.</p>
+            <p>Comment: ${comment}</p>
+            <p>Thank you for your patience.</p>
+            `
+
+            // If prospect is approved, include member ID and temporary password
+            if(status === "approved"){
+                emailText += `
+                <p>Congratulations! You have been approved as a member.</p>
+                <p>Your Member ID is: <strong>${memberId}</strong></p>
+                <p>Your temporary password is: <strong>${generateTempPassword()}</strong></p>
+                <p>Please change your password after your first login.</p>
+                `
+            } 
+
+
             const mailOptions = {
                 from: '"CSEI Prospect Review" <your@email.com>',
                 to: prospect.email,
                 subject: 'Prospect Status Update',
-                html: `
-                <p>Dear ${prospect.prospect_name},</p>
-                <p>Your prospect status has been updated to <strong>${status}</strong>.</p>
-                <p>Comment: ${comment}</p>
-                <p>Thank you for your patience.</p>
-                `
+                html: emailText
             }
 
             transporter.sendMail(mailOptions, (error, info) => {
@@ -138,19 +170,6 @@ exports.updateProspectStatus = async(req, res) => {
 
         }
 
-        if (prospect.prospect_status === "approved") {
-          const generateTempPassword = () => {
-            return crypto.randomBytes(8).toString("hex");
-          };
-
-          const hashedPassword = await bcrypt.hash(generateTempPassword(), 10);
-
-          // Add prospect to member table
-          const request = new sql.Request();
-          request.input("password", sql.VarChar(100), hashedPassword);
-          request.input("prospect_id", sql.UniqueIdentifier, id);
-          await request.execute("AddMember");
-        }
 
         res
           .status(200)
