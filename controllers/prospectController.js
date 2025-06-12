@@ -1,6 +1,9 @@
 const sql = require('mssql')
 const checkRequiredFields = require('../utils/missingFields')
 const config = require('../config/tableConfig')
+const nodemailer = require('nodemailer')
+const crypto = require('crypto')
+const bcrypt = require('bcrypt')
 
 
 // Read/GET prospects from db
@@ -77,7 +80,84 @@ exports.getProspect = async(req, res) => {
     }
 }
 
-// Update prospect 
+// Update prospect and move to member
+exports.updateProspectStatus = async(req, res) => {
+    const { id } = req.params
+    const { status, comment, modifiedBy } = req.body
 
-// Delete a Prospect 
+    try{
+        // update status and comment in prospect table
+        let request = new sql.Request()
+        request.input('_id', sql.UniqueIdentifier, id)
+        request.input('_status', sql.VarChar(50), status)
+        await request.execute('UpdateProspectStatus')
+
+        // Insert into review table
+        request = new sql.Request()
+        request.input('prospect_id', sql.UniqueIdentifier, id)
+        request.input('comment', sql.VarChar(255), comment)
+        request.input('modified_by', sql.VarChar(50), modifiedBy)
+        request.input('status', sql.VarChar(50), status)
+        await request.execute('InsertProspectReview')
+
+        // Get prospect email and send notification
+        request = new sql.Request()
+        request.input("prospect_id", sql.UniqueIdentifier, id);
+        const result = await request.execute('getProspect')
+        const prospect = result.recordset[0]
+
+        if(prospect){
+            // send email
+            const transporter = nodemailer.createTransport({
+              service: "gmail",
+              auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+              },
+            });
+
+            const mailOptions = {
+                from: '"CSEI Prospect Review" <your@email.com>',
+                to: prospect.email,
+                subject: 'Prospect Status Update',
+                html: `
+                <p>Dear ${prospect.prospect_name},</p>
+                <p>Your prospect status has been updated to <strong>${status}</strong>.</p>
+                <p>Comment: ${comment}</p>
+                <p>Thank you for your patience.</p>
+                `
+            }
+
+            transporter.sendMail(mailOptions, (error, info) => {
+                if(error){
+                    console.log('Error sending email:', error)
+                } else {
+                    console.log('Email sent:', info.response)
+                }
+            })
+
+        }
+
+        if (prospect.prospect_status === "approved") {
+          const generateTempPassword = () => {
+            return crypto.randomBytes(8).toString("hex");
+          };
+
+          const hashedPassword = await bcrypt.hash(generateTempPassword(), 10);
+
+          // Add prospect to member table
+          const request = new sql.Request();
+          request.input("password", sql.VarChar(100), hashedPassword);
+          request.input("prospect_id", sql.UniqueIdentifier, id);
+          await request.execute("AddMember");
+        }
+
+        res
+          .status(200)
+          .json({ message: "Prospect status updated" });
+    } catch(err){
+        res.status(500).json({error: err.message})
+    }
+}
+ 
 
