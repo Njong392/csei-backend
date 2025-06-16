@@ -88,6 +88,7 @@ exports.updateProspectStatus = async(req, res) => {
     const generateTempPassword = () => {
       return crypto.randomBytes(8).toString("hex");
     };
+    const tempPassword = generateTempPassword();
 
     try{
         // update status and comment in prospect table
@@ -113,7 +114,7 @@ exports.updateProspectStatus = async(req, res) => {
         let memberId = null
 
         if (status === "approved") {
-          const hashedPassword = await bcrypt.hash(generateTempPassword(), 10);
+          const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
           // Add prospect to member table
           let request = new sql.Request();
@@ -147,7 +148,7 @@ exports.updateProspectStatus = async(req, res) => {
                 emailText += `
                 <p>Congratulations! You have been approved as a member.</p>
                 <p>Your Member ID is: <strong>${memberId}</strong></p>
-                <p>Your temporary password is: <strong>${generateTempPassword()}</strong></p>
+                <p>Your temporary password is: <strong>${tempPassword}</strong></p>
                 <p>Please change your password after your first login.</p>
                 `
             } 

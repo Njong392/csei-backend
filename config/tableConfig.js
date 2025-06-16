@@ -10,6 +10,7 @@ const config = {
     "firstTelephoneLine",
     "email",
     "emergencyContact",
+    "emergencyEmail",
     "emergencyPhonenumber",
     "monthlyCommitment",
     "swornStatement",
@@ -32,6 +33,11 @@ const config = {
     "emergencyPhonenumber",
     "emergencyEmail",
 
+  ],
+
+  loginRequiredFields: [
+    "memberId",
+    "password"
   ]
 };
 

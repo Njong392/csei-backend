@@ -1,50 +1,42 @@
 const sql = require('mssql')
 const checkRequiredFields = require('../utils/missingFields')
 const config = require('../config/tableConfig')
-const crypto = require("crypto")
 const bcrypt = require("bcrypt")
 
-// Create/POST member to db
-exports.addProspect = async(req, res) => {
-    const requiredFields = config.memberRequiredFields
+// member log in
+exports.memberLogin = async(req, res) => {
+    const { memberId, password } = req.body;
+  const requiredFields = config.loginRequiredFields;
 
-    const generateTempPassword = () => {
-        return crypto.randomBytes(8).toString('hex')
+  // Validate required fields
+  const missingFields = checkRequiredFields(req.body, requiredFields);
+  if (missingFields.length > 0) {
+    return res.status(400).json({
+      error: `Missing required fields: ${missingFields.join(", ")}`,
+    });
+  }
+
+  try{
+    const request = new sql.Request()
+    request.input('memberId', sql.VarChar(50), memberId);
+    const result = await request.query('SELECT * FROM Members WHERE member_id = @memberId')
+
+    if(result.recordset.length === 0){
+        return res.status(404).json({error: 'No such member found'})
     }
 
-    const hashedPassword = await bcrypt.hash(generateTempPassword(), 10)
+    const member = result.recordset[0]
 
-    // Validate required fields
-    const missingFields = checkRequiredFields(req.body, requiredFields)
-    if(missingFields.length > 0){
-        return res.status(400).json({
-            error: `Missing required fields: ${missingFields.join(', ')}`
-        })
+    // Compare password with hashed password
+    const passwordMatch = await bcrypt.compare(password, member.password)
+
+    if(!passwordMatch){
+        return res.status(401).json({error: 'Invalid password'})
     }
 
+    res.status(200).json({message: 'Login succesful'})
 
-    // add member to db with stored procedure
-    try{
-        const request = new sql.Request()
-        request.input('password', sql.VarChar(255), hashedPassword);
-        request.input('member_name', sql.VarChar(50), req.body.memberName);
-        request.input('member_surname', sql.VarChar(50), req.body.memberSurname);
-        request.input('date_of_birth', sql.Date, req.body.dateOfBirth);
-        request.input('first_address_line', sql.VarChar(50), req.body.firstAddressLine);
-        request.input('second_address_line', sql.VarChar(50), req.body.secondAddressLine);
-        request.input('city', sql.VarChar(50), req.body.city);
-        request.input('country', sql.VarChar(50), req.body.country);
-        request.input('first_telephone_line', sql.VarChar(50), req.body.firstTelephoneLine);
-        request.input('second_telephone_line', sql.VarChar(20), req.body.secondTelephoneLine);
-        request.input('email', sql.VarChar(50), req.body.email);
-        request.input('telegram_contact', sql.VarChar(50), req.body.telegramContact);
-        request.input('emergency_contact', sql.VarChar(50), req.body.emergencyContact);
-        request.input('emergency_phonenumber', sql.VarChar(20), req.body.emergencyPhonenumber);
-        request.input('emergency_email', sql.VarChar(50), req.body.emergencyEmail);
-
-        await request.execute('AddMember')
-        res.status(201).json({message: 'Member added successfully'})
-    } catch(err){
-        res.status(500).json({error: err.message})
-    }
+  } catch (err){
+    res.status(500).json({error: err.message})
+  }
 }
