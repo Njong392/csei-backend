@@ -4,6 +4,7 @@ const sql = require('mssql')
 const dbConfig = require('./config/db')
 const prospectRoutes = require('./routes/prospectRoute')
 const memberRoutes = require('./routes/memberRoute')
+const cookieParser = require('cookie-parser')
 
 const app = express()
 const port = process.env.PORT
@@ -16,6 +17,7 @@ app.listen(port, () => {
 })
 
 app.use(express.json()) // Middleware to parse JSON bodies
+app.use(cookieParser()) // Middleware to parse cookies
 
 // routes
 app.use('/prospects', prospectRoutes)
