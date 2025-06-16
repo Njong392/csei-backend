@@ -2,6 +2,7 @@ const sql = require('mssql')
 const checkRequiredFields = require('../utils/missingFields')
 const config = require('../config/tableConfig')
 const bcrypt = require("bcrypt")
+const jwt = require('jsonwebtoken')
 
 // member log in
 exports.memberLogin = async(req, res) => {
@@ -34,9 +35,46 @@ exports.memberLogin = async(req, res) => {
         return res.status(401).json({error: 'Invalid password'})
     }
 
+    // Create a JWT token for session
+    const token = jwt.sign(
+      { memberId: member.member_id, role: member.role }, 
+      process.env.SECRET_ACCESS_TOKEN, 
+      {expiresIn: '1h'}
+    )
+
+    // Set token in response header
+    res.cookie('sessionToken', token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'Lax',
+      maxAge: 3600000 
+    })
+
     res.status(200).json({message: 'Login succesful'})
 
   } catch (err){
+    res.status(500).json({error: err.message})
+  }
+}
+
+// log out member
+exports.logout = (req, res) => {
+  res.clearCookie('sessionToken', {
+    httpOnly: true,
+    secure: false,
+    sameSite: 'Lax'
+  })
+  res.status(200).json({message: 'Logged out successfully'})
+}
+
+// Get all members
+exports.getMembers = async(req, res) => {
+  try{
+    const request = new sql.Request()
+
+    const result = await request.query('SELECT * FROM Members')
+    res.status(200).json(result.recordset)
+  } catch(err){
     res.status(500).json({error: err.message})
   }
 }
