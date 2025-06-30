@@ -4,7 +4,7 @@ const verifyRole = (req, res, next) => {
         const { role } = user // extract role from user object
 
         if(role.trim() !== 'admin'){
-            return res.status(401).json({error: 'Access denied. Admins only.'})
+            return res.status(403).json({error: 'Access denied. Admins only.'})
         }
         next() // if role is admin, proceed to the next middleware or route handler
     } catch{

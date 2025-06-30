@@ -2,7 +2,6 @@ const config = {
   prospectRequiredFields: [
     "referrerId",
     "prospectName",
-    "prospectSurname",
     "dateOfBirth",
     "firstAddressLine",
     "city",
@@ -21,7 +20,6 @@ const config = {
   memberRequiredFields:[
     
     "memberName",
-    "memberSurname",
     "dateOfBirth",
     "firstAddressLine",
     "city",
