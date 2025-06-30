@@ -7,7 +7,7 @@ const requireAuth = (req, res, next) => {
 
         // if header does not exist, throw authorization error
         if(!cookie){
-            return res.status(401).json({error: 'Authorization header missing'})
+            return res.status(401).json({error: 'Session token missing'})
         }
 
         // verify if the token has been tampered with of if expired

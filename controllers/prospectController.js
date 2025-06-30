@@ -4,7 +4,7 @@ const config = require('../config/tableConfig')
 const nodemailer = require('nodemailer')
 const crypto = require('crypto')
 const bcrypt = require('bcrypt')
-
+const transporter = require('../utils/nodemailerTransporter')
 
 // Read/GET prospects from db
 exports.getProspects = async (req, res) => {
@@ -35,7 +35,6 @@ exports.addProspect = async(req, res) => {
         const request = new sql.Request()
         request.input('referrer_id', sql.VarChar(50), req.body.referrerId);
         request.input('prospect_name', sql.VarChar(50), req.body.prospectName);
-        request.input('prospect_surname', sql.VarChar(50), req.body.prospectSurname);
         request.input('date_of_birth', sql.Date, req.body.dateOfBirth);
         request.input('first_address_line', sql.VarChar(50), req.body.firstAddressLine);
         request.input('second_address_line', sql.VarChar(50), req.body.secondAddressLine);
@@ -128,14 +127,6 @@ exports.updateProspectStatus = async(req, res) => {
 
         if(prospect){
             // send email
-            const transporter = nodemailer.createTransport({
-              service: "gmail",
-              auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS,
-              },
-            });
-
             let emailText =  `
             <p>Dear ${prospect.prospect_name},</p>
             <p>Your prospect status has been updated to <strong>${status}</strong>.</p>
@@ -155,7 +146,7 @@ exports.updateProspectStatus = async(req, res) => {
 
 
             const mailOptions = {
-                from: '"CSEI Prospect Review" <your@email.com>',
+                from: '"CSEI" <your@email.com>',
                 to: prospect.email,
                 subject: 'Prospect Status Update',
                 html: emailText
