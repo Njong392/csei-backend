@@ -185,8 +185,25 @@ exports.getMembers = async(req, res) => {
   try{
     const request = new sql.Request()
 
-    const result = await request.query('SELECT * FROM Members')
-    res.status(200).json(result.recordset)
+    const membersResult = await request.query('SELECT * FROM Members')
+    const members = membersResult.recordset
+
+    // For each member, get balance
+    const membersBalance = await Promise.all(
+      members.map(async (member) => {
+        const balanceRequest = new sql.Request()
+        balanceRequest.input("member_id", sql.VarChar(50), member.member_id)
+        const balanceResult = await balanceRequest.query(
+          "SELECT csei_database.dbo.CustomerBalance(@member_id) AS balance"
+        )
+        return {
+          ...member,
+          balance: balanceResult.recordset[0].balance
+        }
+      })
+    )
+
+    res.status(200).json(membersBalance)
   } catch(err){
     res.status(500).json({error: err.message})
   }
@@ -200,13 +217,18 @@ exports.getMember = async(req, res) => {
     const request = new sql.Request()
     request.input('member_id', sql.VarChar(50), memberId)
 
+    // Fetch member info
     const result = await request.query('SELECT * FROM Members WHERE member_id = @member_id')
-
     if(result.recordset.length === 0){
       return res.status(404).json({error: 'Member not foundss'})
     }
+    const member = result.recordset[0]
 
-    res.status(200).json(result.recordset[0])
+    // Fetch member balance
+    const balanceRequest = await request.query("SELECT csei_database.dbo.CustomerBalance(@member_id) AS balance")
+    const balance = balanceRequest.recordset[0].balance
+
+    res.status(200).json({...member, balance})
     
   } catch(err){
     res.status(500).json({error: err.message})
@@ -286,3 +308,4 @@ exports.getMemberTransaction = async (req, res) => {
     res.status(500).json({error: "Some error occurred while retrieving this member"})
   }
 }
+

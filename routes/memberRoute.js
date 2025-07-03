@@ -5,7 +5,12 @@ const requireAuth = require('../middleware/requireAuth');
 
 // checking if user is authenticated for frontend
 router.get('/me', requireAuth, (req, res) => {
-  res.status(200).json({ user: req.user.memberId });
+  res.status(200).json({
+    user: {
+      memberId: req.user.memberId,
+      role: req.user.role
+    }
+  });
 
 });
 
