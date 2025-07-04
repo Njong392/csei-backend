@@ -1,7 +1,6 @@
 const sql = require('mssql')
 const checkRequiredFields = require('../utils/missingFields')
 const config = require('../config/tableConfig')
-const nodemailer = require('nodemailer')
 const crypto = require('crypto')
 const bcrypt = require('bcrypt')
 const transporter = require('../utils/nodemailerTransporter')
@@ -10,8 +9,8 @@ const transporter = require('../utils/nodemailerTransporter')
 exports.getProspects = async (req, res) => {
     try{
         const request = new sql.Request()
-
-        const result = await request.query('SELECT * FROM Prospects')
+ 
+        const result = await request.query('SELECT * FROM Prospects ORDER BY [submitted_at] DESC')
         res.status(200).json(result.recordset)
     } catch(err) {
         res.status(500).json({error: err.message})
@@ -83,6 +82,7 @@ exports.getProspect = async(req, res) => {
 exports.updateProspectStatus = async(req, res) => {
     const { id } = req.params
     const { status, comment, modifiedBy } = req.body
+    const loginUrl = process.env.CLIENT_URL + '/login'
 
     const generateTempPassword = () => {
       return crypto.randomBytes(8).toString("hex");
@@ -138,6 +138,7 @@ exports.updateProspectStatus = async(req, res) => {
             if(status === "approved"){
                 emailText += `
                 <p>Congratulations! You have been approved as a member.</p>
+                <p>You can log in via (do not share this link): <span>${loginUrl}</span></p>
                 <p>Your Member ID is: <strong>${memberId}</strong></p>
                 <p>Your temporary password is: <strong>${tempPassword}</strong></p>
                 <p>Please change your password after your first login.</p>
