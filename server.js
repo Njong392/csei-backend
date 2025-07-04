@@ -4,6 +4,7 @@ const sql = require('mssql')
 const dbConfig = require('./config/db')
 const prospectRoutes = require('./routes/prospectRoute')
 const memberRoutes = require('./routes/memberRoute')
+const loanApplicationRoutes = require('./routes/loanApplicationRoute')
 const cookieParser = require('cookie-parser')
 const cors = require('cors')
 
@@ -34,6 +35,7 @@ app.use((req, res, next) => {
 // routes
 app.use('/api/prospects', prospectRoutes)
 app.use('/api/members', memberRoutes)
+app.use('/api/loans', loanApplicationRoutes)
 
 // Connect to SQL Server
 sql
