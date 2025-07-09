@@ -66,6 +66,57 @@ router.post("/upload-engagement-letter", (req, res) => {
   });
 });
 
+router.get("/file/:applicationId", async (req, res) => {
+  const { applicationId } = req.params;
+
+  try {
+    // Get the application to find the engagement letter key
+    const request = new sql.Request();
+    request.input("application_id", sql.VarChar(50), applicationId);
+
+    const result = await request.query(`
+          SELECT engagement_letter, applicant_id 
+          FROM LoanApplications 
+          WHERE loan_application_id = @application_id
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const application = result.recordset[0];
+
+    // Check if user has permission to access this file
+    const isOwner = req.user.memberId === application.applicant_id;
+    const isAdmin = req.user.role?.trim() === "admin";
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (!application.engagement_letter) {
+      return res.status(404).json({ error: "No engagement letter found" });
+    }
+
+    // Extract S3 key
+    let s3Key = application.engagement_letter;
+    if (s3Key.includes("amazonaws.com/")) {
+      s3Key = s3Key.split("amazonaws.com/")[1];
+    }
+
+    // Generate presigned URL (valid for 5 minutes for security)
+    const presignedUrl = await generatePresignedUrl(s3Key, 300);
+
+    res.status(200).json({
+      fileUrl: presignedUrl,
+      expiresIn: 300, // 5 minutes
+    });
+  } catch (error) {
+    console.error("Error generating file access URL:", error);
+    res.status(500).json({ error: "Failed to generate file access URL" });
+  }
+});
+
 // Get all loan applications (admin only)
 router.get("/", requireAuth, verifyRole, loanController.getLoanApplications);
 

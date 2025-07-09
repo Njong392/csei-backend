@@ -77,15 +77,31 @@ exports.getLoanApplication = async (req, res) => {
     // Generate presigned URL for engagement letter if it exists
     if (application.engagement_letter) {
       try {
-        // Extract S3 key from the full URL if needed
-        const s3Key = application.engagement_letter.includes("amazonaws.com")
-          ? application.engagement_letter.split("amazonaws.com/")[1]
-          : application.engagement_letter;
+        // Extract S3 key from the stored URL or use the key directly
+        let s3Key = application.engagement_letter;
 
-        application.engagement_letter_url = generatePresignedUrl(s3Key);
+        // If it's a full S3 URL, extract just the key part
+        if (s3Key.includes("amazonaws.com/")) {
+          s3Key = s3Key.split("amazonaws.com/")[1];
+        } else if (s3Key.includes("s3.")) {
+          // Handle different S3 URL formats
+          const urlParts = s3Key.split("/");
+          s3Key = urlParts
+            .slice(urlParts.indexOf(process.env.S3_BUCKET_NAME) + 1)
+            .join("/");
+        }
+
+        // Generate presigned URL (valid for 1 hour)
+        application.engagement_letter_url = await generatePresignedUrl(
+          s3Key,
+          3600
+        );
+
+        console.log("Generated presigned URL for:", s3Key);
       } catch (error) {
         console.error("Error generating presigned URL:", error);
         // Keep original URL if presigned URL generation fails
+        application.engagement_letter_url = application.engagement_letter;
       }
     }
 
@@ -245,20 +261,30 @@ exports.getMemberLoanApplications = async (req, res) => {
         `);
 
     // Generate presigned URLs for engagement letters
-    const applicationsWithUrls = result.recordset.map((app) => {
-      if (app.engagement_letter) {
-        try {
-          const s3Key = app.engagement_letter.includes("amazonaws.com")
-            ? app.engagement_letter.split("amazonaws.com/")[1]
-            : app.engagement_letter;
+    const applicationsWithUrls = await Promise.all(
+      result.recordset.map(async (app) => {
+        if (app.engagement_letter) {
+          try {
+            let s3Key = app.engagement_letter;
 
-          app.engagement_letter_url = generatePresignedUrl(s3Key);
-        } catch (error) {
-          console.error("Error generating presigned URL:", error);
+            // Extract key from full URL if needed
+            if (s3Key.includes("amazonaws.com/")) {
+              s3Key = s3Key.split("amazonaws.com/")[1];
+            }
+
+            app.engagement_letter_url = await generatePresignedUrl(s3Key, 3600);
+          } catch (error) {
+            console.error(
+              "Error generating presigned URL for app:",
+              app.loan_application_id,
+              error
+            );
+            app.engagement_letter_url = app.engagement_letter;
+          }
         }
-      }
-      return app;
-    });
+        return app;
+      })
+    );
 
     res.status(200).json(applicationsWithUrls);
   } catch (err) {

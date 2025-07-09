@@ -9,7 +9,7 @@ const multer = require("multer");
 const path = require("path");
 const crypto = require("crypto");
 
-// Configure AWS S3 Client (v3)
+// Configuration for AWS S3 Client (v3)
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
@@ -22,12 +22,12 @@ const s3Client = new S3Client({
 const s3Storage = {
   _handleFile: async (req, file, cb) => {
     try {
-      // Generate unique filename
+      // unique filename
       const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
       const fileExtension = path.extname(file.originalname);
       const fileName = `engagement-letters/${uniqueSuffix}${fileExtension}`;
 
-      // Create chunks array to store file data
+      // chunks array to store file data
       const chunks = [];
 
       // Collect file data
@@ -37,7 +37,7 @@ const s3Storage = {
 
       file.stream.on("end", async () => {
         try {
-          // Combine chunks into buffer
+          // Combining chunks into buffer
           const buffer = Buffer.concat(chunks);
 
           // Upload to S3
