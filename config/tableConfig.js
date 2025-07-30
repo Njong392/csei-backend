@@ -36,7 +36,25 @@ const config = {
   loginRequiredFields: [
     "memberId",
     "password"
-  ]
+  ], 
+
+  loanApplicationRequiredFields: [
+    'amount',
+    'duration', 
+    'engagement_letter'
+],
+
+ loanReviewRequiredFields: [
+    'status'
+], 
+
+validLoanStatuses: [
+    'pending',
+    'under_review', 
+    'approved',
+    'rejected',
+    'requires_more_info'
+]
 };
 
 module.exports = config;

@@ -5,6 +5,9 @@ const bcrypt = require("bcrypt")
 const jwt = require('jsonwebtoken')
 const crypto = require('crypto')
 const transporter = require('../utils/nodemailerTransporter')
+const PDFDocument = require('pdfkit')
+const generatePDFContent = require('../utils/generatePDFContent')
+
 
 // member log in
 exports.memberLogin = async(req, res) => {
@@ -220,7 +223,7 @@ exports.getMember = async(req, res) => {
     // Fetch member info
     const result = await request.query('SELECT * FROM Members WHERE member_id = @member_id')
     if(result.recordset.length === 0){
-      return res.status(404).json({error: 'Member not foundss'})
+      return res.status(404).json({error: 'Member not found'})
     }
     const member = result.recordset[0]
 
@@ -309,3 +312,105 @@ exports.getMemberTransaction = async (req, res) => {
   }
 }
 
+
+exports.generateAccountStatement = async (req, res) => {
+  const { memberId } = req.user; // From JWT token
+  const { startDate, endDate } = req.query; // Optional date range
+
+  try {
+    // Get member details
+    let request = new sql.Request();
+    request.input("member_id", sql.VarChar(10), memberId);
+
+    const memberResult = await request.query(`
+          SELECT 
+              member_id, member_name, email, first_telephone_line,
+              first_address_line, second_address_line, city, country,
+              role
+          FROM Members 
+          WHERE member_id = @member_id
+      `);
+
+    if (memberResult.recordset.length === 0) {
+      return res.status(404).json({ error: "Member not found" });
+    }
+
+    const member = memberResult.recordset[0];
+
+    // Get member balance
+    const balanceRequest = new sql.Request();
+    balanceRequest.input("member_id", sql.VarChar(10), memberId);
+    const balanceResult = await balanceRequest.query(
+      "SELECT csei_database.dbo.CustomerBalance(@member_id) AS balance"
+    );
+    const currentBalance = balanceResult.recordset[0].balance || 0;
+
+    // Get transaction history
+    request = new sql.Request();
+    request.input("member_id", sql.VarChar(10), memberId);
+
+    let transactionQuery = `
+          SELECT 
+              [Document No_] as documentNo,
+              [Description] as description,
+              [Original Amount] as originalAmount,
+              [Open Amount] as openAmount,
+              [External Document No_] as externalDocumentNo,
+              [Posting Date] as postingDate
+          FROM MemberTransactionSummary 
+          WHERE member_id = @member_id
+      `;
+
+    // Add date filter if provided
+    if (startDate && endDate) {
+      transactionQuery += ` AND [Posting Date] BETWEEN '${startDate}' AND '${endDate}'`;
+    }
+
+    transactionQuery += ` ORDER BY [Posting Date] DESC`;
+
+    const transactionResult = await request.query(transactionQuery);
+    const transactions = transactionResult.recordset;
+
+    // Calculate summary statistics
+    const totalDeposits = transactions
+      .filter((t) => t.originalAmount > 0)
+      .reduce((sum, t) => sum + parseFloat(t.originalAmount || 0), 0);
+
+    const totalWithdrawals = transactions
+      .filter((t) => t.originalAmount < 0)
+      .reduce((sum, t) => sum + Math.abs(parseFloat(t.originalAmount || 0)), 0);
+
+    // Generate PDF
+    const doc = new PDFDocument({ margin: 50, size: "A4" });
+
+    // Set response headers for PDF download
+    const filename = `account-statement-${memberId}-${
+      new Date().toISOString().split("T")[0]
+    }.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    // Pipe PDF to response
+    doc.pipe(res);
+
+    // Generate PDF content
+    generatePDFContent(
+      doc,
+      member,
+      currentBalance,
+      transactions,
+      totalDeposits,
+      totalWithdrawals,
+      startDate,
+      endDate
+    );
+
+    // Finalize PDF
+    doc.end();
+  } catch (err) {
+    console.error("Error generating account statement:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to generate account statement" });
+    }
+  }
+};

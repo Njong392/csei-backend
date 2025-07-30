@@ -32,10 +32,15 @@ router.post('/request-password-reset', memberController.requestPasswordReset)
 // reset member password
 router.post('/reset-password/:token', memberController.resetMemberPassword)
 
+// get account statement
+router.get('/account', requireAuth, memberController.generateAccountStatement)
+
 // get a single member
 router.get('/:memberId', requireAuth, memberController.getMember)
 
 // get transaction summary for one member
 router.get('/transaction-summary/:memberId', requireAuth, memberController.getMemberTransaction)
+
+
 
 module.exports = router
