@@ -7,7 +7,7 @@ const {
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const multer = require("multer");
 const path = require("path");
-const crypto = require("crypto");
+
 
 // Configuration for AWS S3 Client (v3)
 const s3Client = new S3Client({
